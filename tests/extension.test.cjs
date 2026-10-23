@@ -92,5 +92,3 @@ test('manifest lists existing assets and runtime loads first', () => {
   assert.equal(manifest.content_scripts[0].js[0], 'runtime.js');
   for (const file of [...manifest.content_scripts[0].js, ...manifest.content_scripts[0].css, ...Object.values(manifest.icons)]) assert.ok(fs.existsSync(path.join(root, file)), file);
 });
-
-

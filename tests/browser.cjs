@@ -33,4 +33,3 @@ const { chromium } = require('playwright');
     console.log('PASS: Brave renders both previously hidden pages in the popup and print media; source DOM unchanged; no page errors.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode=1; });
-
