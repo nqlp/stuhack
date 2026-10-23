@@ -1,23 +1,27 @@
-const focusImages = () => {
-    var bluredContainers = Array.from(document.getElementsByClassName('blurred-container'));
-    bluredContainers.forEach( (bluredContainer) => {
-        bluredContainer.firstChild.src = bluredContainer.firstChild.src.replace('/blurred/', '/');
-        bluredContainer.firstChild.classList.add('bi', 'x0', 'y0', 'w1', 'h1');
-        bluredContainer.classList.remove('blurred-container');
-    });
-}
-
-window.addEventListener('load', function(){
-    var pages = document.getElementsByClassName('page-content');
-    for(i=0; i<pages.length; i++){
-        pagecontent=pages[i].parentNode.childNodes;
-        for(j=0; j<pagecontent.length; j++){
-            if(pagecontent[j].className != "page-content"){
-                pagecontent[j].parentNode.removeChild(pagecontent[j]);
-            }
-        }
-        pages[i].classList.add("nofilter");
-    }
-    document.getElementById('viewer-wrapper').addEventListener('scroll', () => {focusImages()});
-    document.getElementById('document-wrapper').addEventListener('scroll', (e) => { focusImages()});
+(() => {
+'use strict';
+const attempted = new WeakMap();
+StuHack.register(() => {
+document.querySelectorAll('.page-content:not(.nofilter)').forEach(page => page.classList.add('nofilter'));
+document.querySelectorAll('.blurred-container').forEach(container => {
+const image = container.querySelector('img');
+if (!image) return;
+const source = image.currentSrc || image.src;
+if (!source || attempted.get(image) === source) return;
+const candidate = new URL(source, document.baseURI);
+if (!candidate.pathname.includes('/blurred/')) return;
+candidate.pathname = candidate.pathname.replace('/blurred/', '/');
+attempted.set(image, source);
+const probe = new Image();
+probe.onload = () => {
+if (!image.isConnected || (image.currentSrc || image.src) !== source) return;
+image.removeAttribute('srcset');
+image.src = candidate.href;
+image.classList.add('bi', 'x0', 'y0', 'w1', 'h1');
+container.classList.remove('blurred-container');
+};
+probe.onerror = () => console.info('[StuHack] An unblurred image is unavailable; keeping the original preview.');
+probe.src = candidate.href;
 });
+});
+})();

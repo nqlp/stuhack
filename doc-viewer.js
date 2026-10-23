@@ -1,71 +1,116 @@
-function downloadDoc(){
-	var head = document.getElementsByTagName("head")[0].innerHTML;
-	var tit = document.getElementsByTagName("h1")[0].innerHTML;
-	var pages = document.getElementById('page-container').childNodes;
+(() => {
+  'use strict';
+  const getPages = () => [...new Set(Array.from(document.querySelectorAll('#page-container .page-content')).map(content => content.closest('.pf') || content))];
+  const hasContent = page => Boolean(page.textContent.trim() || page.querySelector('img[src], canvas, svg, [style*="background-image"]'));
 
-	width = pages[0].offsetWidth;
-	height = pages[0].offsetHeight;
+  // Freeze screen styles before moving nodes out of the website's selector context.
+  function copyPage(source, output) {
+    const clone = source.cloneNode(true);
+    const nativePdfLayout = Boolean(source.querySelector('.pc .t'));
+    const originals = [source, ...source.querySelectorAll('*')];
+    const copies = [clone, ...clone.querySelectorAll('*')];
+    for (let i = 0; i < originals.length; i++) {
+      const original = originals[i];
+      const copy = copies[i];
+      const computed = getComputedStyle(original);
+      if (!nativePdfLayout) for (const property of computed) copy.style.setProperty(property, computed.getPropertyValue(property), 'important');
+      copy.style.setProperty('animation', 'none', 'important');
+      copy.style.setProperty('transition', 'none', 'important');
+      for (const attribute of Array.from(copy.attributes)) {
+        if (attribute.name.startsWith('on')) copy.removeAttribute(attribute.name);
+      }
+      if (original instanceof HTMLImageElement) {
+        copy.src = original.currentSrc || original.src;
+        copy.removeAttribute('srcset');
+        copy.loading = 'eager';
+      }
+      if (original instanceof HTMLCanvasElement) {
+        try {
+          const image = output.createElement('img');
+          image.src = original.toDataURL();
+          image.style.cssText = copy.style.cssText;
+          copy.replaceWith(image);
+        } catch { throw new Error('Un canevas ne peut pas être copié. Export interrompu pour éviter une page vide.'); }
+      }
+    }
+    clone.querySelectorAll('script, iframe, .banner-wrapper').forEach(node => node.remove());
+    for (const content of [clone, ...clone.querySelectorAll('.page-content, .pc')]) {
+      content.hidden = false;
+      content.style.setProperty('display', 'block', 'important');
+      content.style.setProperty('visibility', 'visible', 'important');
+      content.style.setProperty('content-visibility', 'visible', 'important');
+      content.style.setProperty('filter', 'none', 'important');
+    }
+    // Detach the page from viewport positioning while retaining its internal layout.
+    for (const [key, value] of Object.entries({position:'relative', top:'auto', left:'auto', right:'auto', bottom:'auto', margin:'0', transform:'none', filter:'none'})) clone.style.setProperty(key, value, 'important');
+    return clone;
+  }
 
-	if (width > height){
-		print_opt = "{@page {size: A5 landscape;} body {zoom: 90%;}";
-	}else{
-		print_opt = "{@page {size: A5 portrait;}";
-	}
-
-	for(i=0; i<pages.length; i++){
-		pages[i].childNodes[0].style = "display: block;";
-	}
-
-	var pdf = pages[0].parentNode.parentNode.parentNode.innerHTML;
-
-	newWindow = window.open("", "Document", "height=865,width=625,status=yes,toolbar=no,menubar=no");  
-	newWindow.document.getElementsByTagName("head")[0].innerHTML = head + "<style> .nofilter{filter: none !important;} </style>" + "<style> @media print " + print_opt + "</style>";
-	newWindow.document.title = tit;
-	newWindow.document.getElementsByTagName("body")[0].innerHTML = pdf;
-	newWindow.document.getElementsByTagName("body")[0].childNodes[0].style = "";
-}
-
-function addButtons(){
-	button1 = document.createElement("button");
-	button1.classList.add("download-button-1");
-	button1.innerHTML = '<svg aria-hidden="true" focusable="false" data-prefix="fas" class="svg-inline--fa" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><path fill="currentColor" d="M537.6 226.6c4.1-10.7 6.4-22.4 6.4-34.6 0-53-43-96-96-96-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32c-88.4 0-160 71.6-160 160 0 2.7.1 5.4.2 8.1C40.2 219.8 0 273.2 0 336c0 79.5 64.5 144 144 144h368c70.7 0 128-57.3 128-128 0-61.9-44-113.6-102.4-125.4zm-132.9 88.7L299.3 420.7c-6.2 6.2-16.4 6.2-22.6 0L171.3 315.3c-10.1-10.1-2.9-27.3 11.3-27.3H248V176c0-8.8 7.2-16 16-16h48c8.8 0 16 7.2 16 16v112h65.4c14.2 0 21.4 17.2 11.3 27.3z"></path></svg><span class="download-text">Download</span>';
-		
-	let prev_buttons = document.getElementsByClassName("fa-cloud-arrow-down");
-	let i = 0;
-	buttons = [];
-	while(prev_buttons.length > 0){
-		if(prev_buttons[0].parentNode.parentNode.firstChild.classList.contains("download-button-1")){
-			prev_buttons[0].parentNode.remove();
-		}else{
-			buttons.push(button1.cloneNode(true, true));
-			buttons[i].onclick = function() {downloadDoc()};
-			prev_buttons[0].parentNode.parentNode.prepend(buttons[i]);
-			prev_buttons[0].parentNode.remove();
-			i++;
-		}
-		prev_buttons = document.getElementsByClassName("fa-cloud-arrow-down");
-	}
-}
-
-var observer = new MutationObserver(function(mutations) {
-	mutations.forEach(function(mutation) {
-		addButtons();
-	});
-});
-
-
-
-window.addEventListener('load', function(){
-	const prev_buttons = document.getElementsByClassName("fa-cloud-arrow-down");
-	if(prev_buttons.length > 0) {
-		try{
-			addButtons();
-		}catch(err){
-			console.log(err);
-		}finally{
-			let element = document.getElementById("viewer-wrapper");
-			observer.observe(element, { attributes: true, childList: true, subtree: true});
-		}
-	}
-});
-
+  function downloadDoc() {
+    const candidates = getPages();
+    const pages = candidates.filter(hasContent);
+    if (!pages.length) { alert('Aucune page chargée. Faites défiler le document, puis réessayez.'); return; }
+    const preview = window.open('', '_blank');
+    if (!preview) { alert('Allow pop-ups for this site to open the print preview.'); return; }
+    const output = preview.document;
+    output.head.replaceChildren();
+    output.body.replaceChildren();
+    output.body.classList.add('p2hv');
+    output.title = document.querySelector('h1')?.textContent?.trim() || 'Document';
+    const base = output.createElement('base');
+    base.href = document.baseURI;
+    output.head.append(base);
+    // Retain font-face declarations; computed inline styles preserve layout selectors.
+    document.querySelectorAll('link[rel~="stylesheet"], style:not(.darkreader)').forEach(style => output.head.append(style.cloneNode(true)));
+    const css = output.createElement('style');
+    css.textContent = `html, body { margin:0 !important; padding:0 !important; height:auto !important; overflow:visible !important; background:white !important; }
+      .stuhack-sheet { margin:16px auto; overflow:hidden; background:white; box-sizing:content-box; }
+      #stuhack-export-status { display:block; padding:16px; background:#fff4cc; color:#222; font:16px/1.5 system-ui; }
+      @media print { #stuhack-export-status { display:none !important; } .stuhack-sheet { margin:0; break-after:page; break-inside:avoid; } .stuhack-sheet:last-child { break-after:auto; } }`;
+    output.head.append(css);
+    const status = output.createElement('div');
+    status.id = 'stuhack-export-status';
+    const empty = candidates.length - pages.length;
+    status.textContent = `${pages.length} pages avec contenu sur ${candidates.length} détectées. ${empty ? empty + ' pages vides exclues : retournez au document et faites-le défiler pour les charger. ' : ''}Vérifiez ce nombre avec le total annoncé par le document. Chargement des images et polices…`;
+    output.body.append(status);
+    try {
+      pages.forEach((page, index) => {
+        const clone = copyPage(page, output);
+        clone.classList.add('stuhack-print-page');
+        const computed = getComputedStyle(page);
+        const width = parseFloat(computed.width) || page.offsetWidth || page.getBoundingClientRect().width || 794;
+        const height = Math.max(parseFloat(computed.height) || 0, page.scrollHeight, page.offsetHeight) || 1123;
+        const sheet = output.createElement('section');
+        sheet.className = 'stuhack-sheet';
+        sheet.style.width = width + 'px';
+        sheet.style.height = height + 'px';
+        sheet.style.page = 'stuhack' + index;
+        clone.style.setProperty('width', width + 'px', 'important');
+        clone.style.setProperty('height', height + 'px', 'important');
+        css.textContent += `\n@page stuhack${index} { size:${width}px ${height}px; margin:0; }`;
+        sheet.append(clone);
+        output.body.append(sheet);
+      });
+      const images = Array.from(output.images);
+      Promise.allSettled([output.fonts?.ready, ...images.map(image => image.decode())]).then(() => {
+        const failed = images.filter(image => !image.naturalWidth).length;
+        status.textContent = `${pages.length}/${candidates.length} pages détectées exportées. ${empty ? empty + ' pages vides exclues. ' : ''}${failed ? failed + ' images non chargées. ' : ''}Vérifiez le total et le contenu, puis Ctrl+P → Enregistrer au format PDF. Désactivez les en-têtes et pieds de page; utilisez le format de page CSS si proposé.`;
+      });
+    } catch (error) { status.textContent = 'Export incomplet : ' + error.message; }
+    preview.opener = null;
+    preview.focus();
+  }
+  StuHack.register(() => {
+    let button = document.getElementById('stuhack-print-button');
+    if (!getPages().length) { button?.remove(); return; }
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'stuhack-print-button';
+      button.type = 'button';
+      button.textContent = 'Print loaded pages';
+      button.title = 'Faites défiler toutes les pages avant de préparer le PDF.';
+      button.addEventListener('click', downloadDoc);
+      document.body.append(button);
+    }
+  });
+})();

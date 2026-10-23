@@ -98,4 +98,4 @@
     .p2hv .stopoverlappingourstyleplease {
         display: block
     }
-}
+}#stuhack-print-button { position:fixed; bottom:20px; right:20px; z-index:2147483647; padding:12px 18px; border:0; border-radius:24px; background:#178516; color:white; cursor:pointer; font:600 14px system-ui,sans-serif; }

@@ -1,0 +1,12 @@
+{
+  "name": "stuhack-repair",
+  "version": "0.5.9",
+  "private": true,
+  "description": "Regression tests for the StuHack print export repair",
+  "scripts": {
+    "test": "node --test tests/extension.test.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "engines": { "node": ">=24" },
+  "devDependencies": { "jsdom": "30.1.3", "playwright": "1.62.1" }
+}
